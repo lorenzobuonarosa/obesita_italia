@@ -9,9 +9,9 @@ Indice con anteprime e snippet: `index.html` → https://lorenzobuonarosa.github
 | 1 | `sorpasso/` | Per la prima volta nel mondo ci sono più ragazzi obesi che sottopeso | Linee | `data/sorpasso.csv` | 670 |
 | 2 | `disuguaglianza/` | Dove la ricchezza è distribuita peggio, i bambini pesano di più | Scatter + big number | `data/disuguaglianza.csv` | 845 |
 | 3 | `regioni/` | Più si va a Sud, più i bambini hanno chili di troppo | Tile map | `data/regioni.csv` | 895 |
-| 4 | `carrello/` | Il carrello si è ristretto, ma non per tutti | Giochino | `data/carrello.csv` | 610 |
+| 4 | `carrello/` | Il carrello si è ristretto, ma non per tutti | Giochino | `data/carrello.csv` | 555 |
 
-Le altezze sono quelle misurate su desktop (760 px); lo script del CMS poi adatta l'altezza da solo (a 360 px: 780, 980, 872, 1018; il carrello cresce di circa 150 px dopo "Scopri quanto ne riempi") e manda il tema del sito.
+Le altezze sono quelle misurate su desktop (760 px); lo script del CMS poi adatta l'altezza da solo (a 360 px: 780, 980, 892, 950; il carrello cresce di circa 150 px dopo "Scopri quanto ne riempi") e manda il tema del sito.
 
 ## Dati da verificare
 
@@ -84,10 +84,10 @@ Ogni snippet contiene l'iframe e lo script (inline) che adatta l'altezza e manda
 </script>
 ```
 
-### 4. `carrello/` — altezza iniziale 610 px
+### 4. `carrello/` — altezza iniziale 555 px
 
 ```html
-<iframe src="https://lorenzobuonarosa.github.io/obesita_italia/carrello/" width="100%" height="610" frameborder="0" scrolling="no" title="Il carrello si è ristretto, ma non per tutti"></iframe>
+<iframe src="https://lorenzobuonarosa.github.io/obesita_italia/carrello/" width="100%" height="555" frameborder="0" scrolling="no" title="Il carrello si è ristretto, ma non per tutti"></iframe>
 <script>
 (function(){if(window.__radarQNv2)return;window.__radarQNv2=1;var O="https://lorenzobuonarosa.github.io";var MQ=window.matchMedia("(prefers-color-scheme:dark)");function frames(){return Array.prototype.filter.call(document.getElementsByTagName("iframe"),function(f){return(f.getAttribute("src")||"").indexOf(O+"/")===0;});}function theme(){var t=document.documentElement.getAttribute("data-theme");return t==="dark"||t==="light"?t:(MQ.matches?"dark":"light");}function bgOf(el){for(;el&&el.nodeType===1;el=el.parentElement){var c=getComputedStyle(el).backgroundColor;if(c&&c !=="transparent"&&!/rgba\([^)]*,\s*0\)$/.test(c))return c;}return null;}function send(f){try{f.contentWindow.postMessage({sentinel:"radar-qn",type:"theme",theme:theme(),bg:bgOf(f.parentElement)},O);}catch(e){}}function sendAll(){frames().forEach(send);}window.addEventListener("message",function(e){if(e.origin !==O)return;var d=e.data;if(!d||d.sentinel !=="radar-qn"||d.type !=="height")return;frames().forEach(function(f){if(f.contentWindow !==e.source)return;var h=Math.ceil(+d.height);if(h > 0&&20000 > h)f.style.height=h+"px";send(f);});});new MutationObserver(function(){sendAll();setTimeout(sendAll,400);}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});if(MQ.addEventListener)MQ.addEventListener("change",sendAll);})();
 </script>

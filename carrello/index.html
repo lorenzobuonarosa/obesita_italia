@@ -11,7 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="../assets/radar.js"></script>
 <style>
-  .intro { font-size: 15px; line-height: 1.45; margin: 24px 0 0; max-width: 640px; }
+  .r-sub.intro { font-size: 15px; line-height: 1.45; color: var(--ink); max-width: 640px; }
   .bags { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 20px 12px; margin-top: 22px; }
   @media (max-width: 519px) { .bags { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px 10px; } }
   .bag { display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
@@ -48,10 +48,8 @@
 <main class="radar">
   <header>
     <h1 class="r-title">Il carrello si è ristretto, ma non per tutti</h1>
-    <p class="r-sub">Quanto cibo compri oggi con la stessa spesa del 2015, per tipo di alimento. Prezzi al consumo in Italia, 2015-2025</p>
+    <p class="r-sub intro">Nel 2015, con 10 euro riempivi ognuno di questi sacchetti. Quanto pensi di riuscire a riempirne oggi, con gli stessi soldi? Trascina il livello di ogni sacchetto, poi scopri il dato.</p>
   </header>
-
-  <p class="intro">Nel 2015, con 10 euro riempivi ognuno di questi sacchetti. Quanto pensi di riuscire a riempirne oggi, con gli stessi soldi? Trascina il livello di ogni sacchetto, poi scopri il dato.</p>
 
   <div class="bags" id="bags"></div>
 

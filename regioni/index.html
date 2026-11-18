@@ -11,15 +11,15 @@
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="../assets/radar.js"></script>
 <style>
-  /* classi: c1 = più basso ... c5 = più alto (blu 5 → blu 1) */
-  .c1 { --f: var(--blue-5); --t: var(--on-light); }
-  .c2 { --f: var(--blue-4); --t: var(--on-light); }
-  .c3 { --f: var(--blue-3); --t: var(--on-light); }
-  .c4 { --f: var(--blue-2); --t: #ffffff; }
-  .c5 { --f: var(--blue-1); --t: #ffffff; }
+  /* classi: c1 = più basso ... c5 = più alto. Scala fissa in entrambi i temi:
+     più eccesso di peso = blu più scuro (sfumature Flourish Blues, dal passo 5 al passo 1) */
+  .c1 { --f: #b3dcfd; --t: #121212; }
+  .c2 { --f: #76b7f7; --t: #121212; }
+  .c3 { --f: #3f8bed; --t: #121212; }
+  .c4 { --f: #1354d9; --t: #ffffff; }
+  .c5 { --f: #132856; --t: #ffffff; }
   .na { --f: var(--grey-5); --t: var(--ink-2); }
-  :root[data-theme="dark"] .c1, :root[data-theme="dark"] .c2 { --t: #ffffff; }
-  :root[data-theme="dark"] .c3, :root[data-theme="dark"] .c4, :root[data-theme="dark"] .c5 { --t: #121212; }
+  :root[data-theme="dark"] .c5 { --f: #1d3a7a; }   /* un filo più chiaro, per staccarsi dal fondo nero */
   .tile rect { fill: var(--f); }
   .tile text { fill: var(--t); text-anchor: middle; pointer-events: none; }
   .tile .sig { font-size: 12px; font-weight: 600; }
@@ -27,8 +27,7 @@
   .tile { cursor: pointer; }
   .tile.is-on rect { stroke: var(--ink); stroke-width: 2; }
   .leg-sw { stroke: var(--bg); stroke-width: 2; }
-  .leg-sw.c1 { fill: var(--blue-5); } .leg-sw.c2 { fill: var(--blue-4); } .leg-sw.c3 { fill: var(--blue-3); }
-  .leg-sw.c4 { fill: var(--blue-2); } .leg-sw.c5 { fill: var(--blue-1); }
+  .leg-sw { fill: var(--f); }
   .leg-title { font-size: 12px; font-weight: 600; fill: var(--ink); }
   .leg-avg { font-size: 12px; fill: var(--ink); font-weight: 600; }
 </style>
