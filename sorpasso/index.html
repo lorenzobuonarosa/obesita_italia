@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Obesità e sottopeso nel mondo – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+<style>
+  .sw--line { width: 22px; height: 0; border-top: 2px solid var(--ink-2); border-radius: 0; }
+  .sw--dash { border-top-style: dashed; }
+  .halo { paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Per la prima volta nel mondo ci sono più ragazzi obesi che sottopeso</h1>
+    <p class="r-sub">Bambini e ragazzi tra 5 e 19 anni obesi e sottopeso, in percentuale sul totale. Dal 2023 stime UNICEF</p>
+  </header>
+
+  <figure class="r-chart" id="chart"></figure>
+  <div class="r-key">
+    <span><i class="sw sw--line"></i>Stime NCD-RisC, 2000-2022</span>
+    <span><i class="sw sw--line sw--dash"></i>Proiezione UNICEF al 2025</span>
+  </div>
+  <p class="r-note" id="note"></p>
+
+  <footer class="r-foot">
+    <span>Fonte: UNICEF, Child Nutrition Report 2025; NCD-RisC</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  function pc(v) { return fmt(v, 1) + "%"; }
+
+  R.loadCSV("../data/sorpasso.csv").then(function (rows) {
+    var data = rows.map(function (r) {
+      return {
+        year: +r.anno,
+        ob: R.num(r.obesita),
+        th: R.num(r.sottopeso),
+        proj: r.tipo === "proiezione",
+        obM: R.num(r.obesi_milioni),
+        thM: R.num(r.sottopeso_milioni)
+      };
+    }).filter(function (d) { return d.year && d.ob != null && d.th != null; })
+      .sort(function (a, b) { return a.year - b.year; });
+
+    var first = data[0], last = data[data.length - 1];
+    var lastObs = data.filter(function (d) { return !d.proj; }).pop();
+    var cross = data.find(function (d) { return d.ob > d.th; });      // primo anno del sorpasso
+    var mil = data.filter(function (d) { return d.obM != null; }).pop();
+
+    d3.select("#note").text("Obesità: indice di massa corporea oltre 2 deviazioni standard dalla mediana OMS per età e sesso; sottopeso: sotto 2 deviazioni standard. " +
+      "I valori tra " + lastObs.year + " e " + last.year + " sono una proiezione UNICEF basata sull'andamento " + "2010-" + lastObs.year + ": il rapporto non pubblica i valori annuali intermedi.");
+
+    var host = document.getElementById("chart");
+    var tip = R.tooltip(host);
+    var clearActive = function () {};
+    R.dismissOutside(host, function () { tip.hide(); clearActive(); });
+
+    var uid = 0;
+    R.responsive(host, function (W, phase) {
+      uid++;
+      var narrow = R.isNarrow(W);
+      var m = { top: 14, right: narrow ? 46 : 84, bottom: 30, left: 28 };
+      var H = narrow ? 300 : 360;
+      var w = W - m.left - m.right, h = H - m.top - m.bottom;
+
+      var x = d3.scaleLinear().domain([first.year, last.year]).range([0, w]);
+      var yMax = Math.ceil(d3.max(data, function (d) { return Math.max(d.ob, d.th); }) / 2) * 2;
+      var y = d3.scaleLinear().domain([0, yMax]).range([h, 0]);
+      var yTicks = d3.range(0, yMax + 0.001, narrow ? 4 : 2);
+
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).insert("svg", ".r-tip")
+        .attr("width", W).attr("height", H)
+        .attr("role", "img")
+        .attr("aria-label", "Grafico a linee: nel mondo la quota di bambini e ragazzi tra 5 e 19 anni obesi passa dal " +
+          pc(first.ob) + " del " + first.year + " al " + pc(last.ob) + " del " + last.year + ", quella dei sottopeso scende dal " +
+          pc(first.th) + " al " + pc(last.th) + ". Nel " + cross.year + " l'obesità supera il sottopeso.");
+      svg.append("title").text("Bambini e ragazzi tra 5 e 19 anni obesi e sottopeso nel mondo");
+      var g = svg.append("g").attr("transform", "translate(" + m.left + "," + m.top + ")");
+
+      // griglia + etichette Y
+      g.append("g").attr("class", "grid").selectAll("line").data(yTicks).join("line")
+        .attr("x1", 0).attr("x2", w)
+        .attr("y1", function (d) { return Math.round(y(d)) + 0.5; })
+        .attr("y2", function (d) { return Math.round(y(d)) + 0.5; })
+        .attr("class", function (d) { return d === 0 ? "baseline" : null; });
+      g.append("g").selectAll("text").data(yTicks).join("text")
+        .attr("class", "tick-label").attr("x", -8).attr("y", function (d) { return y(d); }).attr("dy", "0.35em")
+        .attr("text-anchor", "end")
+        .text(function (d, i) { return fmt(d, 0) + (i === yTicks.length - 1 ? "%" : ""); });
+
+      // asse X
+      var years = d3.range(first.year, last.year + 1, 5);
+      var xa = g.append("g").attr("transform", "translate(0," + h + ")");
+      xa.selectAll("line").data(years).join("line")
+        .attr("x1", function (d) { return Math.round(x(d)) + 0.5; }).attr("x2", function (d) { return Math.round(x(d)) + 0.5; })
+        .attr("y1", 0).attr("y2", 5).style("stroke", "var(--ink)");
+      xa.selectAll("text").data(years).join("text")
+        .attr("class", "tick-label").attr("x", function (d) { return x(d); }).attr("y", 20)
+        .attr("text-anchor", "middle")
+        .text(function (d) { return narrow && d !== first.year ? "’" + String(d).slice(2) : d; });
+
+      // clip: tratto pieno fino all'ultima stima, tratteggiato dopo
+      var xs = x(lastObs.year);
+      var defs = svg.append("defs");
+      defs.append("clipPath").attr("id", "cA" + uid).append("rect").attr("x", -10).attr("y", -m.top).attr("width", xs + 10).attr("height", H);
+      defs.append("clipPath").attr("id", "cB" + uid).append("rect").attr("x", xs).attr("y", -m.top).attr("width", w - xs + 20).attr("height", H);
+
+      var series = [
+        { key: "th", name: "Sottopeso", color: "var(--grey)" },
+        { key: "ob", name: "Obesità", color: "var(--red)" }
+      ];
+      var paths = {};
+      series.forEach(function (s) {
+        var line = d3.line().curve(d3.curveMonotoneX)
+          .x(function (d) { return x(d.year); }).y(function (d) { return y(d[s.key]); });
+        var gs = g.append("g");
+        var solid = gs.append("path").datum(data).attr("d", line).attr("clip-path", "url(#cA" + uid + ")")
+          .style("fill", "none").style("stroke", s.color).attr("stroke-width", 2.5)
+          .attr("stroke-linejoin", "round").attr("stroke-linecap", "round");
+        var dashed = gs.append("path").datum(data).attr("d", line).attr("clip-path", "url(#cB" + uid + ")")
+          .style("fill", "none").style("stroke", s.color).attr("stroke-width", 2.5).attr("stroke-dasharray", "5 4");
+        paths[s.key] = solid.node();
+        // animazione: la linea si disegna con una maschera che si allarga
+        var L = solid.node().getTotalLength();
+        R.enter(solid, phase,
+          function (sel) { sel.attr("stroke-dasharray", L + " " + L).attr("stroke-dashoffset", L); },
+          function (sel) { sel.attr("stroke-dashoffset", 0); });
+        R.enter(dashed, phase, function (sel) { sel.style("opacity", 0); }, function (sel) { sel.style("opacity", 1); }, R.DUR * 0.85);
+      });
+
+      // y sulla curva a una data x (la curva è monotona in x)
+      function yAt(node, X) {
+        var lo = 0, hi = node.getTotalLength(), p;
+        for (var i = 0; i < 30; i++) {
+          var mid = (lo + hi) / 2; p = node.getPointAtLength(mid);
+          if (p.x < X) lo = mid; else hi = mid;
+        }
+        return p.y;
+      }
+      // punto d'incrocio sulle curve, tra l'ultimo anno con sottopeso più alto e il primo del sorpasso
+      var prev = data[data.indexOf(cross) - 1];
+      var a = x(prev.year), b = x(cross.year);
+      for (var k = 0; k < 30; k++) {
+        var mid = (a + b) / 2;
+        if (yAt(paths.ob, mid) > yAt(paths.th, mid)) a = mid; else b = mid;   // y SVG: più in basso = valore minore
+      }
+      var cx = (a + b) / 2, cy = yAt(paths.ob, cx);
+
+      // etichette dirette a destra (valori dell'ultimo anno)
+      var labs = g.append("g");
+      var lo = y(last.ob), lt = y(last.th);
+      var gap = 30, mid2 = (lo + lt) / 2;
+      [[series[1], last.ob, Math.min(lo, mid2 - gap / 2)], [series[0], last.th, Math.max(lt, mid2 + gap / 2)]].forEach(function (s) {
+        var t = labs.append("text").attr("x", w + 8).attr("y", s[2]);
+        t.append("tspan").attr("class", "series-label").attr("x", w + 8).attr("dy", narrow ? "-0.1em" : "0.35em")
+          .style("fill", s[0].key === "ob" ? "var(--red)" : "var(--ink-2)").text(pc(s[1]));
+        if (!narrow) t.append("tspan").attr("class", "series-label--sub").attr("x", w + 8).attr("dy", "1.25em").text(s[0].name);
+      });
+      // nomi delle serie a sinistra
+      var nm = g.append("g");
+      nm.append("text").attr("class", "series-label halo").attr("x", 2).attr("y", y(first.th) - 10)
+        .style("fill", "var(--ink-2)").text("Sottopeso");
+      nm.append("text").attr("class", "series-label halo").attr("x", 2).attr("y", y(first.ob) + 20)
+        .style("fill", "var(--red)").text("Obesità");
+      R.enter(labs, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.9);
+
+      // annotazione sul punto d'incrocio
+      var an = g.append("g").attr("class", "anno");
+      var tw = narrow ? Math.min(170, cx - 4) : 220;
+      // desktop: testo sopra le linee; mobile: sotto, dove c'è spazio libero
+      var ty = narrow ? yAt(paths.ob, Math.max(0, cx - tw)) + 24 : Math.max(16, y(yMax * 0.93));
+      var txt = an.append("text").attr("x", cx - 6).attr("y", ty).attr("text-anchor", "end")
+        .text("Nel " + cross.year + " l'obesità supera il sottopeso per la prima volta: " + fmt(mil.obM, 0) + " milioni di ragazzi obesi")
+        .call(R.wrap, tw);
+      if (narrow) an.append("line").attr("x1", cx).attr("x2", cx).attr("y1", cy + 5).attr("y2", ty + ((+txt.attr("data-lines") || 1) - 1) * 13 * 1.35 + 3);
+      else an.append("line").attr("x1", cx).attr("x2", cx).attr("y1", ty - 9).attr("y2", cy - 5);
+      an.append("circle").attr("cx", cx).attr("cy", cy).attr("r", 3);
+      R.enter(an, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR);
+
+      // interazione: crosshair + punti
+      var crossL = g.append("line").attr("class", "crosshair").attr("y1", 0).attr("y2", h).style("opacity", 0);
+      var dots = g.append("g").style("opacity", 0);
+      var dOb = dots.append("circle").attr("r", 4.5).style("fill", "var(--red)").style("stroke", "var(--bg)").attr("stroke-width", 1.5);
+      var dTh = dots.append("circle").attr("r", 4.5).style("fill", "var(--grey)").style("stroke", "var(--bg)").attr("stroke-width", 1.5);
+
+      function activate(d) {
+        var px = x(d.year);
+        crossL.attr("x1", px).attr("x2", px).style("opacity", 1);
+        dOb.attr("cx", px).attr("cy", y(d.ob));
+        dTh.attr("cx", px).attr("cy", y(d.th));
+        dots.style("opacity", 1);
+        var rowsT = [["Obesi", pc(d.ob)], ["Sottopeso", pc(d.th)]];
+        if (d.obM != null) rowsT.push(["Obesi, in milioni", fmt(d.obM, 0)]);
+        if (d.thM != null) rowsT.push(["Sottopeso, in milioni", fmt(d.thM, 0)]);
+        tip.show(R.tipHTML({
+          title: String(d.year),
+          rows: rowsT,
+          note: d.proj ? "Proiezione UNICEF sull'andamento 2010-" + lastObs.year + ", non un dato osservato" : null
+        }), px + m.left, Math.min(y(d.ob), y(d.th)) + m.top);
+      }
+      clearActive = function () { crossL.style("opacity", 0); dots.style("opacity", 0); };
+      g.append("rect").attr("class", "hit")
+        .attr("x", -6).attr("y", -m.top).attr("width", w + 12).attr("height", h + m.top)
+        .on("pointermove pointerdown", function (ev) {
+          var mx = d3.pointer(ev, g.node())[0];
+          activate(d3.least(data, function (d) { return Math.abs(x(d.year) - mx); }));
+        })
+        .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); clearActive(); } });
+    });
+  }).catch(function (e) { R.fail("#chart", e); });
+})();
+</script>
+</body>
+</html>

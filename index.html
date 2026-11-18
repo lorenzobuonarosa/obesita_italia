@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Infanzia e obesità – dataviz Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<style>
+  :root { --ink: #1a1a1a; --ink-2: #6b6b6b; --rule: #e3e3e3; --bg: #f7f8f9; --card: #ffffff; }
+  @media (prefers-color-scheme: dark) { :root { --ink: #f2f2f2; --ink-2: #a8abae; --rule: #2c2e30; --bg: #121212; --card: #1b1c1e; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 "Libre Franklin", Arial, sans-serif; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font: 700 34px/1.1 "Newsreader", Georgia, serif; margin: 0 0 8px; }
+  .lead { color: var(--ink-2); margin: 0 0 32px; max-width: 760px; }
+  section { border-top: 1px solid var(--rule); padding: 28px 0; }
+  h2 { font: 700 24px/1.15 "Newsreader", Georgia, serif; margin: 0 0 4px; }
+  .meta { color: var(--ink-2); font-size: 13px; margin: 0 0 16px; }
+  .meta a { color: inherit; }
+  .previews { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+  .pv { background: var(--card); border: 1px solid var(--rule); }
+  .pv span { display: block; font-size: 12px; color: var(--ink-2); padding: 6px 10px; border-bottom: 1px solid var(--rule); }
+  .pv iframe { display: block; border: 0; }
+  .pv--d iframe { width: 760px; max-width: calc(100vw - 34px); }
+  .pv--m iframe { width: 360px; max-width: calc(100vw - 34px); }
+  .snip { margin-top: 16px; position: relative; }
+  .snip pre { background: var(--card); border: 1px solid var(--rule); padding: 12px; font-size: 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; max-height: 140px; margin: 0; }
+  .snip button { position: absolute; top: 8px; right: 8px; font: 600 13px "Libre Franklin", sans-serif; padding: 6px 12px; border: 1px solid var(--ink); background: var(--ink); color: var(--bg); border-radius: 2px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Giornata dei diritti dell'infanzia: obesità, disuguaglianza, prezzi del cibo</h1>
+  <p class="lead">Quattro dataviz Radar – QN, dal mondo all'Italia. Per ognuna: anteprima desktop (760 px) e mobile (360 px) e lo snippet da incollare nel CMS (iframe + script, già pronto). Fonti, scelte sui dati e dati da verificare nel README.</p>
+  <div id="list"></div>
+</div>
+<script>
+(function () {
+  var BASE = "https://lorenzobuonarosa.github.io/obesita_italia/";
+  var ORIGIN = "https://lorenzobuonarosa.github.io";
+  var VIZ = [
+    { slug: "sorpasso", title: "Per la prima volta nel mondo ci sono più ragazzi obesi che sottopeso", h: 670, csv: "sorpasso.csv", desc: "Linee, 2000-2025" },
+    { slug: "disuguaglianza", title: "Dove la ricchezza è distribuita peggio, i bambini pesano di più", h: 845, csv: "disuguaglianza.csv", desc: "Scatter, 43 paesi" },
+    { slug: "regioni", title: "Più si va a Sud, più i bambini hanno chili di troppo", h: 895, csv: "regioni.csv", desc: "Tile map, 21 regioni e province autonome" },
+    { slug: "carrello", title: "Il carrello si è ristretto, ma non per tutti", h: 610, csv: "carrello.csv", desc: "Giochino interattivo" }
+  ];
+  fetch("assets/embed.min.js").then(function (r) { return r.text(); }).then(function (emb) {
+    emb = emb.trim().replace("https://ACCOUNT.github.io", ORIGIN);
+    var list = document.getElementById("list");
+    VIZ.forEach(function (v) {
+      var snippet = '<iframe src="' + BASE + v.slug + '/" width="100%" height="' + v.h + '" frameborder="0" scrolling="no" title="' + v.title + '"></iframe>\n<script>\n' + emb + '\n</scr' + 'ipt>';
+      var s = document.createElement("section");
+      s.innerHTML = '<h2></h2><p class="meta"></p>' +
+        '<div class="previews"><div class="pv pv--d"><span>Desktop · 760 px</span><iframe height="' + v.h + '" scrolling="no"></iframe></div>' +
+        '<div class="pv pv--m"><span>Mobile · 360 px</span><iframe height="900" scrolling="no"></iframe></div></div>' +
+        '<div class="snip"><pre></pre><button type="button">Copia</button></div>';
+      s.querySelector("h2").textContent = v.title;
+      s.querySelector(".meta").innerHTML = v.desc + " · altezza iniziale " + v.h + " px · <a href='" + v.slug + "/'>apri</a> · <a href='data/" + v.csv + "'>CSV</a>";
+      s.querySelectorAll("iframe").forEach(function (f) { f.src = v.slug + "/"; f.title = v.title; });
+      s.querySelector("pre").textContent = snippet;
+      var btn = s.querySelector("button");
+      btn.addEventListener("click", function () {
+        navigator.clipboard.writeText(snippet).then(function () { btn.textContent = "Copiato"; setTimeout(function () { btn.textContent = "Copia"; }, 1500); });
+      });
+      list.appendChild(s);
+    });
+  });
+  // altezza delle anteprime (stessa origine)
+  window.addEventListener("message", function (e) {
+    var d = e.data;
+    if (!d || d.sentinel !== "radar-qn" || d.type !== "height") return;
+    document.querySelectorAll("iframe").forEach(function (f) { if (f.contentWindow === e.source) f.style.height = Math.ceil(d.height) + "px"; });
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Il carrello che si restringe – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+<style>
+  .intro { font-size: 15px; line-height: 1.45; margin: 24px 0 0; max-width: 640px; }
+  .bags { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 20px 12px; margin-top: 22px; }
+  @media (max-width: 519px) { .bags { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px 10px; } }
+  .bag { display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
+  .bag svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: none; cursor: ns-resize; }
+  .bag.is-locked svg { cursor: default; touch-action: auto; }
+  .bag__name { font-size: 13px; font-weight: 600; line-height: 1.25; margin: 8px 0 4px; min-height: 3.75em; }
+  .bag__body { fill: var(--bg); stroke: var(--ink-2); stroke-width: 1.5; }
+  .bag__handle { fill: none; stroke: var(--ink-2); stroke-width: 3; stroke-linecap: round; }
+  .bag__fill { fill: var(--grey-4); }
+  .bag.is-fresco .bag__fill.is-true { fill: var(--red); }
+  .bag .bag__fill.is-true { fill: var(--blue); }
+  .bag__grip { stroke: var(--ink); stroke-width: 2; }
+  .bag__val { font-size: 19px; font-weight: 700; fill: var(--ink); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; font-variant-numeric: tabular-nums; }
+  .bag__est { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 4 3; }
+  .bag__avg { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 0.1 4; stroke-linecap: round; }
+  .bag__res { font-size: 12px; color: var(--ink-2); min-height: 1.4em; font-variant-numeric: tabular-nums; margin-top: 4px; }
+  .bag__res b { color: var(--ink); font-weight: 600; }
+  input[type=range] { width: 100%; margin: 0; accent-color: var(--ink); height: 24px; }
+  input[type=range]:disabled { opacity: 0.35; }
+  .actions { margin-top: 22px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn { font: 600 14px/1 var(--sans); padding: 12px 18px; border-radius: 2px; border: 1px solid var(--ink); background: var(--ink); color: var(--bg); cursor: pointer; }
+  .btn--ghost { background: transparent; color: var(--ink); }
+  .btn:focus-visible, input[type=range]:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .result { margin-top: 18px; }
+  .result[hidden] { display: none; }
+  .result__main { font-size: 17px; line-height: 1.4; font-weight: 600; margin: 0; max-width: 680px; }
+  .result__acc { font-size: 15px; line-height: 1.45; margin: 8px 0 0; color: var(--ink); max-width: 680px; }
+  .sw--est { width: 20px; height: 0; border-top: 1.5px dashed var(--ink); border-radius: 0; }
+  .sw--avg { width: 20px; height: 0; border-top: 2px dotted var(--ink); border-radius: 0; }
+  .sw--fresh { background: var(--red); } .sw--other { background: var(--blue); }
+</style>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Il carrello si è ristretto, ma non per tutti</h1>
+    <p class="r-sub">Quanto cibo compri oggi con la stessa spesa del 2015, per tipo di alimento. Prezzi al consumo in Italia, 2015-2025</p>
+  </header>
+
+  <p class="intro">Nel 2015, con 10 euro riempivi ognuno di questi sacchetti. Quanto pensi di riuscire a riempirne oggi, con gli stessi soldi? Trascina il livello di ogni sacchetto, poi scopri il dato.</p>
+
+  <div class="bags" id="bags"></div>
+
+  <div class="actions">
+    <button class="btn" id="go" type="button">Scopri quanto ne riempi</button>
+    <button class="btn btn--ghost" id="again" type="button" hidden>Gioca di nuovo</button>
+  </div>
+
+  <div class="result" id="result" hidden aria-live="polite">
+    <p class="result__main" id="phrase"></p>
+    <p class="result__acc" id="accuracy"></p>
+    <div class="r-key">
+      <span><i class="sw sw--fresh"></i>Frutta e verdura fresche</span>
+      <span><i class="sw sw--other"></i>Altri alimenti</span>
+      <span><i class="sw sw--est"></i>La tua stima</span>
+      <span id="key-avg"><i class="sw sw--avg"></i></span>
+    </div>
+  </div>
+
+  <p class="r-note">Quanto riempi oggi = la spesa del 2015 divisa per il rincaro di ogni voce (indice 2015 ÷ indice 2025). Le voci sono le categorie dei prezzi al consumo armonizzati e non coincidono con la distinzione tra cibo sano e ultraprocessato.</p>
+
+  <footer class="r-foot">
+    <span>Fonte: Eurostat, indici armonizzati dei prezzi al consumo (HICP), Italia, medie annue</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  var TOL = 3;                         // entro 3 punti = stima precisa
+  var VB = { w: 100, h: 124, top: 32, bottom: 120 };   // geometria del sacchetto (viewBox)
+  var BODY = "M14," + VB.top + " L86," + VB.top + " L91," + VB.bottom + " L9," + VB.bottom + " Z";
+  var HANDLE = "M33," + (VB.top + 4) + " C33,6 67,6 67," + (VB.top + 4);
+
+  function lev(p) { return VB.bottom - (VB.bottom - VB.top) * p / 100; }   // percentuale -> y
+  function alPct(n) {   // "al 66%", "all'86%", "all'8%", "all'11%"
+    var s = String(n);
+    return (n === 1 || n === 11 || s.charAt(0) === "8" ? "all'" : "al ") + s + "%";
+  }
+  function lc(s) { return s.charAt(0).toLowerCase() + s.slice(1); }
+  function signed(v) { return v > 0 ? "+" + v : v < 0 ? "−" + Math.abs(v) : "0"; }
+
+  R.loadCSV("../data/carrello.csv").then(function (rows) {
+    var all = rows.map(function (r) {
+      var i15 = R.num(r.indice_2015), i25 = R.num(r.indice_2025);
+      return { name: r.voce, group: r.gruppo, fill: i15 / i25 * 100 };
+    });
+    var avgRow = all.find(function (d) { return d.group === "media"; });
+    var items = all.filter(function (d) { return d.group !== "media"; });
+    items.forEach(function (d) { d.est = 100; d.shown = Math.round(d.fill); });
+    var avg = avgRow ? avgRow.fill : null;
+    var revealed = false;
+
+    if (avg != null) d3.select("#key-avg").append("span").text("Media di tutti gli alimentari (" + fmt(avg, 0) + "%)");
+    else d3.select("#key-avg").remove();
+
+    var wrap = d3.select("#bags");
+    var cards = wrap.selectAll("div.bag").data(items).join("div")
+      .attr("class", function (d) { return "bag" + (d.group === "fresco" ? " is-fresco" : ""); });
+
+    cards.each(function (d, i) {
+      var card = d3.select(this);
+      var svg = card.append("svg").attr("viewBox", "0 0 " + VB.w + " " + VB.h)
+        .attr("role", "img").attr("aria-label", "Sacchetto: " + d.name);
+      var cid = "clip" + i;
+      svg.append("clipPath").attr("id", cid).append("path").attr("d", BODY);
+      svg.append("path").attr("class", "bag__handle").attr("d", HANDLE);
+      svg.append("path").attr("class", "bag__body").attr("d", BODY);
+      var gIn = svg.append("g").attr("clip-path", "url(#" + cid + ")");
+      d.fillRect = gIn.append("rect").attr("class", "bag__fill").attr("x", 0).attr("width", VB.w);
+      d.avgLine = gIn.append("line").attr("class", "bag__avg").attr("x1", 4).attr("x2", 96).style("opacity", 0);
+      d.estLine = gIn.append("line").attr("class", "bag__est").attr("x1", 4).attr("x2", 96).style("opacity", 0);
+      d.grip = gIn.append("line").attr("class", "bag__grip").attr("x1", 38).attr("x2", 62);
+      svg.append("path").attr("d", BODY).style("fill", "none").style("stroke", "var(--ink-2)").attr("stroke-width", 1.5);
+      d.valText = svg.append("text").attr("class", "bag__val").attr("x", 50).attr("y", 84);
+      d.svg = svg;
+
+      card.append("div").attr("class", "bag__name").text(d.name);
+      d.input = card.append("input").attr("type", "range").attr("min", 0).attr("max", 100).attr("step", 1)
+        .attr("aria-label", "La tua stima per " + d.name + ", in percentuale del sacchetto del 2015")
+        .property("value", d.est)
+        .on("input", function () { setEst(d, +this.value); });
+      d.res = card.append("div").attr("class", "bag__res");
+
+      // trascinamento diretto sul sacchetto
+      function fromEvent(ev) {
+        var pt = d3.pointer(ev, svg.node());
+        var p = Math.round((VB.bottom - pt[1]) / (VB.bottom - VB.top) * 100);
+        return Math.max(0, Math.min(100, p));
+      }
+      var dragging = false;
+      svg.on("pointerdown", function (ev) {
+        if (revealed) return;
+        dragging = true; this.setPointerCapture(ev.pointerId); setEst(d, fromEvent(ev)); ev.preventDefault();
+      }).on("pointermove", function (ev) { if (dragging) setEst(d, fromEvent(ev)); })
+        .on("pointerup pointercancel", function () { dragging = false; });
+    });
+
+    function draw(d, p, color) {   // disegna il livello p (0-100)
+      var y = lev(p);
+      d.fillRect.attr("y", y).attr("height", VB.bottom - y + 2);
+      d.grip.attr("y1", y).attr("y2", y).style("opacity", revealed ? 0 : 1);
+    }
+    function setEst(d, v) {
+      d.est = v;
+      d.input.property("value", v);
+      draw(d, v);
+      d.valText.text(v + "%");
+    }
+    items.forEach(function (d) { setEst(d, 100); });
+
+    function reveal() {
+      revealed = true;
+      d3.select("#go").attr("hidden", true);
+      d3.select("#again").attr("hidden", null);
+      var dur = R.reduced ? 0 : 1100;
+      items.forEach(function (d, i) {
+        d3.select(d.svg.node().parentNode).classed("is-locked", true);
+        d.input.attr("disabled", true);
+        d.fillRect.classed("is-true", true);
+        d.grip.style("opacity", 0);
+        var yE = lev(d.est);
+        d.estLine.attr("y1", yE).attr("y2", yE).style("opacity", 1);
+        if (avg != null) d.avgLine.attr("y1", lev(avg)).attr("y2", lev(avg)).transition().delay(dur).duration(300).style("opacity", 1);
+        var from = d.est, to = d.fill;
+        d.fillRect.transition().delay(i * 60).duration(dur).ease(d3.easeCubicInOut)
+          .attr("y", lev(to)).attr("height", VB.bottom - lev(to) + 2);
+        d.valText.transition().delay(i * 60).duration(dur).ease(d3.easeCubicInOut).tween("text", function () {
+          var node = this, f = d3.interpolateNumber(from, to);
+          return function (t) { node.textContent = Math.round(f(t)) + "%"; };
+        });
+        var diff = d.est - d.shown;
+        d.res.html("Tu <b>" + d.est + "%</b> · " + signed(diff));
+      });
+
+      // frase: voce con il riempimento più basso e più alto
+      var lo = d3.least(items, function (d) { return d.fill; }), hi = d3.greatest(items, function (d) { return d.fill; });
+      d3.select("#phrase").text("Con gli stessi 10 euro del 2015, oggi il sacchetto di " + lc(lo.name) + " si riempie solo " + alPct(lo.shown) +
+        ", quello di " + lc(hi.name) + " ancora " + alPct(hi.shown) + ".");
+
+      // precisione del lettore
+      var mae = d3.mean(items, function (d) { return Math.abs(d.est - d.shown); });
+      var fresh = items.filter(function (d) { return d.group === "fresco"; });
+      var fBias = d3.mean(fresh, function (d) { return d.est - d.shown; });
+      var maeR = Math.round(mae), fb = Math.round(Math.abs(fBias));
+      var txt = maeR === 0 ? "Hai indovinato tutti i sacchetti. " :
+        "In media la tua stima si è discostata dal dato vero di " + maeR + (maeR === 1 ? " punto" : " punti") + ". ";
+      if (fBias > TOL) txt += "Su frutta e verdura fresche la tua stima è stata ottimista: in media " + fb + " punti sopra il dato vero.";
+      else if (fBias < -TOL) txt += "Su frutta e verdura fresche la tua stima è stata pessimista: in media " + fb + " punti sotto il dato vero.";
+      else txt += "Su frutta e verdura fresche la tua stima è stata precisa, entro " + TOL + " punti dal dato vero.";
+      d3.select("#accuracy").text(txt);
+      d3.select("#result").attr("hidden", null);
+      R.scheduleHeight();
+    }
+
+    function reset() {
+      revealed = false;
+      d3.select("#go").attr("hidden", null);
+      d3.select("#again").attr("hidden", true);
+      d3.select("#result").attr("hidden", true);
+      items.forEach(function (d) {
+        d3.select(d.svg.node().parentNode).classed("is-locked", false);
+        d.input.attr("disabled", null);
+        d.fillRect.interrupt().classed("is-true", false);
+        d.valText.interrupt();
+        d.estLine.style("opacity", 0);
+        d.avgLine.interrupt().style("opacity", 0);
+        d.res.html("");
+        setEst(d, 100);
+      });
+      R.scheduleHeight();
+      document.getElementById("go").focus({ preventScroll: true });
+    }
+
+    d3.select("#go").on("click", reveal);
+    d3.select("#again").on("click", reset);
+  }).catch(function (e) { R.fail("#bags", e); });
+})();
+</script>
+</body>
+</html>

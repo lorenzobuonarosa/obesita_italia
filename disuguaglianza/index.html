@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Disuguaglianza e sovrappeso infantile – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+<style>
+  .pt { transition: opacity 180ms ease; }
+  .pt-label { font-size: 12px; font-weight: 500; fill: var(--ink-2); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+  .pt-label--it { font-size: 13px; font-weight: 700; fill: var(--red); }
+  .axis-title { font-size: 12px; fill: var(--ink-2); }
+  .trend { stroke: var(--grey); stroke-width: 1; fill: none; }
+  .sw--trend { width: 18px; height: 0; border-top: 1px solid var(--grey); border-radius: 0; }
+</style>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Dove la ricchezza è distribuita peggio, i bambini pesano di più</h1>
+    <p class="r-sub">Disuguaglianza di reddito e quota di bambini e ragazzi in sovrappeso nei paesi OCSE e ad alto reddito</p>
+  </header>
+
+  <div class="r-big" id="big" aria-hidden="true">
+    <span><span class="r-big__num" id="big-num">&nbsp;</span> <span class="r-big__unit">volte</span></span>
+    <span class="r-big__label">quanto è più diffuso il sovrappeso infantile nei paesi più diseguali rispetto ai più egualitari</span>
+  </div>
+
+  <figure class="r-chart" id="chart" style="margin-top:20px"></figure>
+  <div class="r-key">
+    <span><i class="sw" style="background:var(--red);border-radius:50%"></i>Italia</span>
+    <span><i class="sw" style="background:var(--blue);border-radius:50%"></i>Altri paesi</span>
+    <span><i class="sw sw--trend"></i>Tendenza</span>
+  </div>
+  <p class="r-note" id="note"></p>
+
+  <footer class="r-foot">
+    <span>Fonte: UNICEF Innocenti, Report Card 20 (2026)</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  var N_ESTREMI = 5;                 // paesi a ciascun capo per il big number
+  var ETICHETTE = ["IT", "CL", "CR", "US", "JP", "CZ"];
+
+  R.loadCSV("../data/disuguaglianza.csv").then(function (rows) {
+    var data = rows.map(function (r) {
+      return {
+        name: r.paese, iso: r.iso2,
+        x: R.num(r.rapporto_80_20), y: R.num(r.sovrappeso),
+        year: r.anno_sovrappeso, age: r.eta_sovrappeso,
+        rank: R.num(r.posizione_benessere), of: R.num(r.paesi_in_classifica)
+      };
+    }).filter(function (d) { return d.x != null && d.y != null; });
+
+    // ---- big number: sovrappeso medio dei N più diseguali / dei N più egualitari ----
+    var byX = data.slice().sort(function (a, b) { return a.x - b.x; });
+    function ratio(n) {
+      return d3.mean(byX.slice(-n), function (d) { return d.y; }) / d3.mean(byX.slice(0, n), function (d) { return d.y; });
+    }
+    var big = ratio(N_ESTREMI);
+    var quinto = Math.round(data.length / 5);
+    var bigFmt = function (v) { return fmt(v, 1); };
+    var bigNum = d3.select("#big-num");
+    if (R.reduced) bigNum.text(bigFmt(big));
+    else { bigNum.text(bigFmt(0)); R.onFirstView(document.getElementById("big"), function () { R.countUp(bigNum, big, bigFmt, "play"); }); }
+
+    // regressione lineare (minimi quadrati)
+    var mx = d3.mean(data, function (d) { return d.x; }), my = d3.mean(data, function (d) { return d.y; });
+    var slope = d3.sum(data, function (d) { return (d.x - mx) * (d.y - my); }) / d3.sum(data, function (d) { return (d.x - mx) * (d.x - mx); });
+    var icpt = my - slope * mx;
+
+    var mostEq = byX.slice(0, N_ESTREMI).map(function (d) { return d.name; });
+    var mostUneq = byX.slice(-N_ESTREMI).map(function (d) { return d.name; });
+    var it = data.find(function (d) { return d.iso === "IT"; });
+    d3.select("#note").text(
+      "Il numero in alto confronta il sovrappeso medio dei " + N_ESTREMI + " paesi più diseguali (" + mostUneq.join(", ") + ") con quello dei " +
+      N_ESTREMI + " più egualitari (" + mostEq.join(", ") + "), come nel comunicato UNICEF; con un quinto dei paesi per parte (" + quinto +
+      ") il rapporto è " + fmt(ratio(quinto), 1) + ". Sovrappeso: indice di massa corporea oltre 1 deviazione standard dalla mediana OMS, obesità compresa (" +
+      data[0].age + ", " + data[0].year + "). Disuguaglianza: ultimo dato disponibile, 2023 o precedente. " +
+      data.length + " paesi: la Colombia non ha il dato. Valori letti dal grafico del rapporto.");
+
+    var host = document.getElementById("chart");
+    var tip = R.tooltip(host);
+    var clearActive = function () {};
+    R.dismissOutside(host, function () { tip.hide(); clearActive(); });
+
+    function ord(n) { return fmt(n, 0) + "ª"; }
+
+    R.responsive(host, function (W, phase) {
+      var narrow = R.isNarrow(W);
+      var m = { top: 22, right: 12, bottom: 44, left: 30 };
+      var H = narrow ? 360 : 440;
+      var w = W - m.left - m.right, h = H - m.top - m.bottom;
+
+      var x = d3.scaleLinear().domain([Math.floor(d3.min(data, function (d) { return d.x; })) - 0.5, Math.ceil(d3.max(data, function (d) { return d.x; })) + 0.3]).range([0, w]);
+      var y = d3.scaleLinear().domain([10, Math.ceil(d3.max(data, function (d) { return d.y; }) / 10) * 10]).range([h, 0]);
+      var xTicks = x.ticks(narrow ? 5 : 10).filter(function (t) { return t === Math.round(t); });
+      var yTicks = d3.range(y.domain()[0], y.domain()[1] + 0.1, 10);
+
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", H)
+        .attr("role", "img")
+        .attr("aria-label", "Grafico a dispersione su " + data.length + " paesi: dove la disuguaglianza di reddito è più alta, la quota di bambini e ragazzi in sovrappeso tende a essere più alta. " +
+          "In Italia il reddito del 20% più ricco è " + fmt(it.x, 2) + " volte quello del 20% più povero e i ragazzi in sovrappeso sono il " + fmt(it.y, 1) + "%.");
+      svg.append("title").text("Disuguaglianza di reddito e sovrappeso infantile");
+      var g = svg.append("g").attr("transform", "translate(" + m.left + "," + m.top + ")");
+
+      g.append("g").attr("class", "grid").selectAll("line").data(yTicks).join("line")
+        .attr("x1", 0).attr("x2", w)
+        .attr("y1", function (d) { return Math.round(y(d)) + 0.5; }).attr("y2", function (d) { return Math.round(y(d)) + 0.5; });
+      g.append("g").selectAll("text").data(yTicks).join("text").attr("class", "tick-label")
+        .attr("x", -8).attr("y", function (d) { return y(d); }).attr("dy", "0.35em").attr("text-anchor", "end")
+        .text(function (d, i) { return fmt(d, 0) + (i === yTicks.length - 1 ? "%" : ""); });
+      g.append("text").attr("class", "axis-title").attr("x", 0).attr("y", -10).text("Bambini e ragazzi in sovrappeso");
+
+      var xa = g.append("g").attr("transform", "translate(0," + h + ")");
+      xa.append("line").attr("x1", 0).attr("x2", w).attr("y1", 0.5).attr("y2", 0.5).style("stroke", "var(--grey-light)");
+      xa.selectAll("line.t").data(xTicks).join("line").attr("class", "t")
+        .attr("x1", function (d) { return Math.round(x(d)) + 0.5; }).attr("x2", function (d) { return Math.round(x(d)) + 0.5; })
+        .attr("y1", 0).attr("y2", 5).style("stroke", "var(--ink)");
+      xa.selectAll("text").data(xTicks).join("text").attr("class", "tick-label")
+        .attr("x", function (d) { return x(d); }).attr("y", 19).attr("text-anchor", "middle").text(function (d) { return fmt(d, 0); });
+      g.append("text").attr("class", "axis-title").attr("x", w).attr("y", h + 38).attr("text-anchor", "end")
+        .text(narrow ? "Reddito del 20% più ricco ÷ 20% più povero" : "Disuguaglianza: reddito del 20% più ricco diviso quello del 20% più povero");
+
+      // linea di tendenza
+      var x0 = x.domain()[0] + 0.3, x1 = d3.max(data, function (d) { return d.x; });
+      var tr = g.append("line").attr("class", "trend")
+        .attr("x1", x(x0)).attr("y1", y(icpt + slope * x0)).attr("x2", x(x1)).attr("y2", y(icpt + slope * x1));
+      R.enter(tr, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.6);
+
+      // pallini (Italia per ultima, sopra gli altri)
+      var ordered = data.slice().sort(function (a, b) { return (a.iso === "IT") - (b.iso === "IT"); });
+      var r0 = narrow ? 4.5 : 5.5;
+      var pts = g.append("g").selectAll("circle").data(ordered).join("circle")
+        .attr("class", "pt")
+        .attr("cx", function (d) { return x(d.x); }).attr("cy", function (d) { return y(d.y); })
+        .style("fill", function (d) { return d.iso === "IT" ? "var(--red)" : "var(--blue)"; })
+        .style("fill-opacity", function (d) { return d.iso === "IT" ? 1 : 0.8; })
+        .style("stroke", "var(--bg)").attr("stroke-width", 1);
+      pts.each(function (d) {
+        var s = d3.select(this), rr = d.iso === "IT" ? r0 + 1.5 : r0;
+        R.enter(s, phase, function (s) { s.attr("r", 0); }, function (s) { s.attr("r", rr); }, (x(d.x) / w) * R.DUR * 0.6);
+      });
+
+      // etichette dirette
+      var lab = g.append("g");
+      ETICHETTE.forEach(function (iso) {
+        var d = data.find(function (p) { return p.iso === iso; });
+        if (!d) return;
+        var px = x(d.x), py = y(d.y);
+        if (iso === "IT") {
+          // l'Italia sta nel gruppo centrale: etichetta spostata nello spazio libero in basso a destra
+          var lx = x(d.x + (narrow ? 1.6 : 1.3)), ly = y(d.y - 3);
+          lab.append("line").attr("x1", px + 4).attr("y1", py + 3).attr("x2", lx - 3).attr("y2", ly - 4)
+            .style("stroke", "var(--red)").attr("stroke-width", 0.75);
+          lab.append("text").attr("class", "pt-label pt-label--it").attr("x", lx).attr("y", ly).attr("dy", "0.35em").text(d.name);
+          return;
+        }
+        var right = px + 70 < w;
+        var t = lab.append("text").attr("class", "pt-label")
+          .attr("x", right ? px + r0 + 4 : px - r0 - 4).attr("y", py).attr("dy", "0.35em")
+          .attr("text-anchor", right ? "start" : "end").text(d.name);
+        if (iso === "CZ" || iso === "JP") t.attr("x", px).attr("y", py + r0 + 11).attr("text-anchor", "middle");
+        if (iso === "US" && narrow) t.attr("x", px).attr("y", py - r0 - 9).attr("text-anchor", "middle");
+      });
+      R.enter(lab, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.8);
+
+      // interazione: punto più vicino (Delaunay)
+      var del = d3.Delaunay.from(data, function (d) { return x(d.x); }, function (d) { return y(d.y); });
+      function activate(d) {
+        pts.classed("is-dimmed", function (p) { return p !== d; })
+          .attr("r", function (p) { return p === d ? r0 + 2.5 : (p.iso === "IT" ? r0 + 1.5 : r0); });
+        tip.show(R.tipHTML({
+          title: d.name,
+          rows: [
+            ["Rapporto ricchi/poveri", fmt(d.x, 2)],
+            ["In sovrappeso", fmt(d.y, 1) + "%"],
+            ["Benessere dei bambini", d.rank != null ? ord(d.rank) + " su " + fmt(d.of, 0) : "non in classifica"]
+          ],
+          note: d.rank == null ? "Il Report Card non classifica i paesi senza dati completi" : null
+        }), x(d.x) + m.left, y(d.y) + m.top);
+      }
+      clearActive = function () {
+        pts.classed("is-dimmed", false).attr("r", function (p) { return p.iso === "IT" ? r0 + 1.5 : r0; });
+      };
+      g.append("rect").attr("class", "hit").attr("x", -m.left).attr("y", -m.top).attr("width", W).attr("height", h + m.top + 10)
+        .on("pointermove pointerdown", function (ev) {
+          var p = d3.pointer(ev, g.node()), i = del.find(p[0], p[1]), d = data[i];
+          if (Math.hypot(x(d.x) - p[0], y(d.y) - p[1]) > 40) { tip.hide(); clearActive(); return; }
+          activate(d);
+        })
+        .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); clearActive(); } });
+    });
+  }).catch(function (e) { R.fail("#chart", e); });
+})();
+</script>
+</body>
+</html>

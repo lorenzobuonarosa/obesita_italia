@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bambini in eccesso di peso per regione – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+<style>
+  /* classi: c1 = più basso ... c5 = più alto (blu 5 → blu 1) */
+  .c1 { --f: var(--blue-5); --t: var(--on-light); }
+  .c2 { --f: var(--blue-4); --t: var(--on-light); }
+  .c3 { --f: var(--blue-3); --t: var(--on-light); }
+  .c4 { --f: var(--blue-2); --t: #ffffff; }
+  .c5 { --f: var(--blue-1); --t: #ffffff; }
+  .na { --f: var(--grey-5); --t: var(--ink-2); }
+  :root[data-theme="dark"] .c1, :root[data-theme="dark"] .c2 { --t: #ffffff; }
+  :root[data-theme="dark"] .c3, :root[data-theme="dark"] .c4, :root[data-theme="dark"] .c5 { --t: #121212; }
+  .tile rect { fill: var(--f); }
+  .tile text { fill: var(--t); text-anchor: middle; pointer-events: none; }
+  .tile .sig { font-size: 12px; font-weight: 600; }
+  .tile .val { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tile { cursor: pointer; }
+  .tile.is-on rect { stroke: var(--ink); stroke-width: 2; }
+  .leg-sw { stroke: var(--bg); stroke-width: 2; }
+  .leg-sw.c1 { fill: var(--blue-5); } .leg-sw.c2 { fill: var(--blue-4); } .leg-sw.c3 { fill: var(--blue-3); }
+  .leg-sw.c4 { fill: var(--blue-2); } .leg-sw.c5 { fill: var(--blue-1); }
+  .leg-title { font-size: 12px; font-weight: 600; fill: var(--ink); }
+  .leg-avg { font-size: 12px; fill: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Più si va a Sud, più i bambini hanno chili di troppo</h1>
+    <p class="r-sub">Bambini di 8-9 anni in sovrappeso o obesi, in percentuale, per regione. Anno 2023</p>
+  </header>
+
+  <figure class="r-chart" id="chart"></figure>
+  <p class="r-note" id="note"></p>
+
+  <footer class="r-foot">
+    <span>Fonte: Istituto Superiore di Sanità, OKkio alla Salute 2023</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  var BREAKS = [20, 25, 30, 35];      // soglie delle classi (punti percentuali)
+  function pc(v) { return v == null ? "n.d." : fmt(v, 1) + "%"; }
+  function cls(v) { if (v == null) return "na"; var i = d3.bisectRight(BREAKS, v); return "c" + (i + 1); }
+  function signed(v) { return (v > 0 ? "+" : v < 0 ? "−" : "") + fmt(Math.abs(v), 1); }
+
+  R.loadCSV("../data/regioni.csv").then(function (rows) {
+    var all = rows.map(function (r) {
+      return {
+        name: r.regione, sig: r.sigla, col: R.num(r.col), row: R.num(r.riga),
+        sov: R.num(r.sovrappeso), ob: R.num(r.obesita), grave: R.num(r.obesita_grave),
+        ecc: R.num(r.eccesso_ponderale), ecc19: R.num(r.eccesso_ponderale_2019), note: r.nota
+      };
+    });
+    var ita = all.find(function (d) { return d.col == null; });
+    var data = all.filter(function (d) { return d.col != null && d.row != null; });
+    var withVal = data.filter(function (d) { return d.ecc != null; });
+    var hi = d3.greatest(withVal, function (d) { return d.ecc; }), lo = d3.least(withVal, function (d) { return d.ecc; });
+    var nCols = d3.max(data, function (d) { return d.col; }) + 1, nRows = d3.max(data, function (d) { return d.row; }) + 1;
+    var nGrave = data.filter(function (d) { return d.grave == null; }).map(function (d) { return d.name; });
+
+    d3.select("#note").text("Eccesso di peso = sovrappeso più obesità, secondo le soglie dell'International Obesity Task Force; l'obesità comprende quella grave. " +
+      "Media nazionale: " + pc(ita.ecc) + "; minimo " + pc(lo.ecc) + " (" + lo.name + "), massimo " + pc(hi.ecc) + " (" + hi.name + "). " +
+      (nGrave.length ? "Per " + nGrave.join(", ").replace(/, ([^,]*)$/, " e $1") + " non è stato pubblicato il report regionale 2023: manca il dato sull'obesità grave." : ""));
+
+    var host = document.getElementById("chart");
+    var tip = R.tooltip(host);
+    var clearActive = function () {};
+    R.dismissOutside(host, function () { tip.hide(); clearActive(); });
+
+    R.responsive(host, function (W, phase) {
+      var narrow = R.isNarrow(W);
+      var gap = narrow ? 4 : 5;
+      var size = Math.min(70, Math.floor((W - gap * (nCols - 1)) / nCols));
+      var mapW = nCols * size + (nCols - 1) * gap, mapH = nRows * size + (nRows - 1) * gap;
+      var ox = Math.round((W - mapW) / 2);
+      var legW = Math.min(W, 380), legH = 64;
+      var H = mapH + 26 + legH;
+
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", H)
+        .attr("role", "img")
+        .attr("aria-label", "Mappa a quadrati delle regioni italiane: i bambini di 8-9 anni in sovrappeso o obesi vanno dal " + pc(lo.ecc) + " (" + lo.name +
+          ") al " + pc(hi.ecc) + " (" + hi.name + "), con valori più alti al Sud. Media nazionale " + pc(ita.ecc) + ".");
+      svg.append("title").text("Bambini di 8-9 anni in eccesso di peso per regione, 2023");
+
+      var g = svg.append("g").attr("transform", "translate(" + ox + ",0)");
+      var tiles = g.selectAll("g.tile").data(data).join("g")
+        .attr("class", function (d) { return "tile mark " + cls(d.ecc); })
+        .attr("transform", function (d) { return "translate(" + d.col * (size + gap) + "," + d.row * (size + gap) + ")"; })
+        .attr("tabindex", 0).attr("role", "button")
+        .attr("aria-label", function (d) { return d.name + ": " + pc(d.ecc) + " in eccesso di peso"; });
+      tiles.append("rect").attr("width", size).attr("height", size).attr("rx", 2);
+      tiles.append("text").attr("class", "sig").attr("x", size / 2).attr("y", size / 2 - (narrow ? 4 : 6)).text(function (d) { return d.sig; });
+      var vals = tiles.append("text").attr("class", "val").attr("x", size / 2).attr("y", size / 2 + (narrow ? 11 : 13))
+        .style("font-size", narrow ? "12px" : "14px");
+      vals.each(function (d) {
+        var s = d3.select(this);
+        if (d.ecc == null) { s.text("n.d."); return; }
+        R.countUp(s, d.ecc, function (v) { return fmt(v, 1) + "%"; }, phase, d.row * 50);
+      });
+      tiles.each(function (d) {
+        R.enter(d3.select(this).select("rect"), phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, d.row * 50);
+      });
+
+      // ---- legenda a classi con la media nazionale ----
+      var lg = svg.append("g").attr("transform", "translate(" + Math.round((W - legW) / 2) + "," + (mapH + 26) + ")");
+      lg.append("text").attr("class", "leg-title").attr("x", 0).attr("y", 0).text("In eccesso di peso, % dei bambini");
+      var segW = legW / (BREAKS.length + 1), by = 28, bh = 12;
+      var classes = d3.range(BREAKS.length + 1);
+      lg.selectAll("rect").data(classes).join("rect").attr("class", function (i) { return "leg-sw c" + (i + 1); })
+        .attr("x", function (i) { return i * segW; }).attr("y", by).attr("width", segW).attr("height", bh);
+      lg.selectAll("text.tick-label").data(BREAKS).join("text").attr("class", "tick-label")
+        .attr("x", function (b, i) { return (i + 1) * segW; }).attr("y", by + bh + 15).attr("text-anchor", "middle")
+        .text(function (b) { return fmt(b, 0); });
+      // posizione della media dentro la sua classe (scala lineare per segmento)
+      var lo0 = d3.min(withVal, function (d) { return d.ecc; }), hi0 = d3.max(withVal, function (d) { return d.ecc; });
+      var edges = [Math.min(lo0, BREAKS[0] - 5)].concat(BREAKS).concat([Math.max(hi0, BREAKS[BREAKS.length - 1] + 5)]);
+      function legX(v) {
+        var i = Math.max(0, Math.min(BREAKS.length, d3.bisectRight(BREAKS, v)));
+        return i * segW + segW * (v - edges[i]) / (edges[i + 1] - edges[i]);
+      }
+      var ax = legX(ita.ecc);
+      lg.append("line").attr("x1", ax).attr("x2", ax).attr("y1", by - 6).attr("y2", by + bh + 2).style("stroke", "var(--ink)").attr("stroke-width", 1.5);
+      lg.append("text").attr("class", "leg-avg").attr("x", ax).attr("y", by - 9).attr("text-anchor", "middle")
+        .text("Italia " + pc(ita.ecc));
+
+      // ---- interazione ----
+      function activate(d, el) {
+        tiles.classed("is-dimmed", function (p) { return p !== d; }).classed("is-on", function (p) { return p === d; });
+        var rowsT = [
+          ["Sovrappeso", pc(d.sov)],
+          ["Obesità (grave compresa)", pc(d.ob)],
+          ["di cui obesità grave", pc(d.grave)]
+        ];
+        if (d.ecc != null && d.ecc19 != null) rowsT.push(["Rispetto al 2019", signed(d.ecc - d.ecc19) + " punti"]);
+        tip.show(R.tipHTML({ title: d.name, value: pc(d.ecc), unit: "in eccesso di peso", rows: rowsT, note: d.note || null }),
+          ox + d.col * (size + gap) + size / 2, d.row * (size + gap) + 6);
+      }
+      clearActive = function () { tiles.classed("is-dimmed", false).classed("is-on", false); };
+      tiles.on("pointerenter pointerdown", function (ev, d) { activate(d, this); })
+        .on("focus", function (ev, d) { activate(d, this); })
+        .on("blur", function () { tip.hide(); clearActive(); });
+      g.on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); clearActive(); } });
+    });
+  }).catch(function (e) { R.fail("#chart", e); });
+})();
+</script>
+</body>
+</html>
