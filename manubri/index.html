@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rincari del cibo, Italia e Ue – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+<style>
+  .row-name { font-size: 13px; font-weight: 500; fill: var(--ink); }
+  .grp-name { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; fill: var(--ink-2); }
+  .grp-rule { stroke: var(--rule); stroke-width: 1; shape-rendering: crispEdges; }
+  .zero { stroke: var(--ink); stroke-width: 1; shape-rendering: crispEdges; }
+  .zero-label { font-size: 12px; font-weight: 600; fill: var(--ink); }
+  .conn { stroke: var(--grey-4); stroke-width: 2; }
+  .val { font-size: 12px; font-weight: 700; fill: var(--red); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+  .who { font-size: 12px; font-weight: 600; paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+  .dir { font-size: 11px; fill: var(--ink-2); }
+  .row { cursor: pointer; }
+</style>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">In Italia è rincarato soprattutto il cibo fresco</h1>
+    <p class="r-sub">Di quanti punti ogni voce è rincarata più o meno della media degli alimentari dal 2019 al 2025. Italia e media dell'Unione Europea</p>
+  </header>
+
+  <figure class="r-chart" id="chart"></figure>
+  <div class="r-key">
+    <span><i class="sw" style="background:var(--red);border-radius:50%"></i>Italia</span>
+    <span><i class="sw" style="background:var(--grey-1);border-radius:50%"></i>Media Ue</span>
+  </div>
+  <p class="r-note" id="note"></p>
+
+  <footer class="r-foot">
+    <span>Fonte: Eurostat, indici armonizzati dei prezzi al consumo (HICP), medie annue</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  var GROUPS = [{ key: "fresco", label: "Cibo fresco" }, { key: "confezionato", label: "Confezionato e dolci" }];
+
+  // rincaro in % con un decimale (gli scarti si calcolano su questi valori, così tornano con quelli mostrati)
+  function rinc(a, b) { return Math.round((b / a - 1) * 1000) / 10; }
+  function sgn(v, unit) {
+    var r = Math.round(v * 10) / 10;
+    if (r === 0) return fmt(0, 1) + (unit || "");
+    return (r > 0 ? "+" : "−") + fmt(Math.abs(r), 1) + (unit || "");
+  }
+
+  R.loadCSV("../data/manubri.csv").then(function (rows) {
+    var all = rows.map(function (r) {
+      return {
+        name: r.voce, group: r.gruppo, note: r.nota || "",
+        it: rinc(R.num(r.italia_2019), R.num(r.italia_2025)),
+        ue: rinc(R.num(r.ue_2019), R.num(r.ue_2025))
+      };
+    });
+    var tot = all.find(function (d) { return d.group === "media"; });
+    var data = all.filter(function (d) { return d.group !== "media"; });
+    data.forEach(function (d) {
+      d.dIt = Math.round((d.it - tot.it) * 10) / 10;
+      d.dUe = Math.round((d.ue - tot.ue) * 10) / 10;
+    });
+    // ordine: per gruppo, poi dallo scarto italiano più alto al più basso
+    var ordered = [];
+    GROUPS.forEach(function (g) {
+      ordered = ordered.concat(data.filter(function (d) { return d.group === g.key; }).sort(function (a, b) { return b.dIt - a.dIt; }));
+    });
+    var notes = data.filter(function (d) { return d.note; }).map(function (d) { return d.note; });
+    d3.select("#note").text((notes.length ? notes.join(". ") + ". " : "") +
+      "Rincaro di ogni voce dal 2019 al 2025 meno il rincaro di tutti gli alimentari nello stesso paese (Italia " + sgn(tot.it, "%") +
+      ", media Ue " + sgn(tot.ue, "%") + "), in punti percentuali.");
+
+    var host = document.getElementById("chart");
+    var tip = R.tooltip(host);
+    var clearActive = function () {};
+    R.dismissOutside(host, function () { tip.hide(); clearActive(); });
+
+    R.responsive(host, function (W, phase) {
+      var narrow = R.isNarrow(W);
+      var labelW = narrow ? 0 : 210;              // su mobile il nome va sopra la riga
+      var rowH = narrow ? 50 : 36, grpH = 34, top = 34, bottom = 46;
+      var m = { left: labelW, right: 34 };
+      var w = W - m.left - m.right;
+
+      // posizioni verticali: intestazione di gruppo + righe
+      var yPos = [], y = top, layout = [];
+      GROUPS.forEach(function (g, gi) {
+        var items = ordered.filter(function (d) { return d.group === g.key; });
+        if (!items.length) return;
+        layout.push({ type: "grp", label: g.label, y: y, first: gi === 0 });
+        y += grpH;
+        items.forEach(function (d) { d.y = y + rowH / 2 + (narrow ? 8 : 0); y += rowH; });
+        y += 8;
+      });
+      var H = y + bottom;
+
+      var ext = d3.extent(data.flatMap(function (d) { return [d.dIt, d.dUe]; }).concat([0]));
+      var pad = narrow ? 3 : 2.5;
+      var x = d3.scaleLinear().domain([Math.floor((ext[0] - pad) / 5) * 5, Math.ceil((ext[1] + pad) / 5) * 5]).range([0, w]).nice();
+      var ticks = x.ticks(narrow ? 5 : 8).filter(function (t) { return t % 5 === 0; });
+
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", H).attr("role", "img")
+        .attr("aria-label", "Grafico a manubri: dal 2019 al 2025 in Italia " + ordered.filter(function (d) { return d.group === "fresco"; }).map(function (d) {
+          return lcFirst(d.name) + " " + sgn(d.dIt) + " punti";
+        }).join(" e ") + " rispetto alla media degli alimentari; " + ordered.slice(-1).map(function (d) { return lcFirst(d.name) + " " + sgn(d.dIt) + " punti"; })[0] + ".");
+      svg.append("title").text("Rincari 2019-2025 rispetto alla media degli alimentari, Italia e Ue");
+      var g = svg.append("g").attr("transform", "translate(" + m.left + ",0)");
+
+      // gruppi
+      layout.forEach(function (l) {
+        if (!l.first) svg.append("line").attr("class", "grp-rule").attr("x1", 0).attr("x2", W).attr("y1", l.y - 4 + 0.5).attr("y2", l.y - 4 + 0.5);
+        svg.append("text").attr("class", "grp-name").attr("x", 0).attr("y", l.y + 16).text(l.label);
+      });
+
+      // griglia verticale + asse
+      var yTop = top, yBot = y - 8;
+      g.append("g").attr("class", "grid").selectAll("line").data(ticks.filter(function (t) { return t !== 0; })).join("line")
+        .attr("x1", function (t) { return Math.round(x(t)) + 0.5; }).attr("x2", function (t) { return Math.round(x(t)) + 0.5; })
+        .attr("y1", yTop + grpH - 6).attr("y2", yBot);
+      g.append("g").selectAll("text").data(ticks).join("text").attr("class", "tick-label")
+        .attr("x", function (t) { return x(t); }).attr("y", yBot + 16).attr("text-anchor", "middle")
+        .text(function (t) { return t === 0 ? "0" : (t > 0 ? "+" : "−") + fmt(Math.abs(t), 0); });
+      g.append("text").attr("class", "dir").attr("x", x(0) - 6).attr("y", yBot + 34).attr("text-anchor", "end").text("← rincarato meno");
+      g.append("text").attr("class", "dir").attr("x", x(0) + 6).attr("y", yBot + 34).text("rincarato di più →");
+
+      // zero = media degli alimentari
+      var zx = Math.round(x(0)) + 0.5;
+      g.append("line").attr("class", "zero").attr("x1", zx).attr("x2", zx).attr("y1", 14).attr("y2", yBot);
+      g.append("text").attr("class", "zero-label").attr("x", zx).attr("y", 9)
+        .attr("text-anchor", x(0) > w * 0.6 ? "end" : x(0) < w * 0.3 ? "start" : "middle").text("media degli alimentari");
+
+      // righe
+      var r0 = narrow ? 5.5 : 6;
+      var rowsG = g.selectAll("g.row").data(ordered).join("g").attr("class", "row mark")
+        .attr("transform", function (d) { return "translate(0," + d.y + ")"; });
+      rowsG.append("rect").attr("class", "hit").attr("x", -m.left).attr("y", -rowH / 2 - (narrow ? 8 : 0)).attr("width", W).attr("height", rowH);
+      rowsG.append("text").attr("class", "row-name")
+        .attr("x", narrow ? 0 : -m.left).attr("y", narrow ? -16 : 0).attr("dy", "0.35em")
+        .text(function (d) { return d.name; })
+        .each(function () { if (!narrow) R.wrap(d3.select(this), labelW - 14, 1.2); });
+      // il testo a capo su due righe va ricentrato
+      rowsG.selectAll(".row-name").each(function () {
+        var n = +this.getAttribute("data-lines") || 1;
+        if (n > 1) d3.select(this).attr("transform", "translate(0," + (-(n - 1) * 13 * 1.2 / 2) + ")");
+      });
+
+      var conn = rowsG.append("line").attr("class", "conn").attr("y1", 0).attr("y2", 0);
+      var dUe = rowsG.append("circle").attr("r", r0).style("fill", "var(--grey-1)").style("stroke", "var(--bg)").attr("stroke-width", 1.5);
+      var dIt = rowsG.append("circle").attr("r", r0).style("fill", "var(--red)").style("stroke", "var(--bg)").attr("stroke-width", 1.5);
+      var vals = rowsG.append("text").attr("class", "val").attr("dy", "0.35em")
+        .attr("text-anchor", function (d) { return d.dIt >= d.dUe ? "start" : "end"; })
+        .attr("x", function (d) { return x(d.dIt) + (d.dIt >= d.dUe ? r0 + 5 : -r0 - 5); })
+        .text(function (d) { return sgn(d.dIt); });
+
+      R.enter(conn, phase, function (s) { s.attr("x1", x(0)).attr("x2", x(0)); },
+        function (s) { s.attr("x1", function (d) { return x(d.dIt); }).attr("x2", function (d) { return x(d.dUe); }); });
+      R.enter(dUe, phase, function (s) { s.attr("cx", x(0)); }, function (s) { s.attr("cx", function (d) { return x(d.dUe); }); });
+      R.enter(dIt, phase, function (s) { s.attr("cx", x(0)); }, function (s) { s.attr("cx", function (d) { return x(d.dIt); }); });
+      R.enter(vals, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.7);
+
+      // etichette dirette "Italia" e "Ue" solo sulla prima riga
+      var f = ordered[0];
+      var lab = g.append("g");
+      [["Italia", f.dIt, "var(--red)"], ["Ue", f.dUe, "var(--grey-1)"]].forEach(function (a) {
+        lab.append("text").attr("class", "who").attr("x", x(a[1])).attr("y", f.y - r0 - 6).attr("text-anchor", "middle")
+          .style("fill", a[2]).text(a[0]);
+      });
+      if (narrow) lab.selectAll("text").attr("y", f.y + r0 + 14);
+      R.enter(lab, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.8);
+
+      // interazione
+      function activate(d) {
+        rowsG.classed("is-dimmed", function (p) { return p !== d; });
+        tip.show(R.tipHTML({
+          title: d.name,
+          rows: [
+            ["Rincaro in Italia", sgn(d.it, "%")],
+            ["Rincaro nell'Ue", sgn(d.ue, "%")],
+            ["Alimentari in Italia", sgn(tot.it, "%")],
+            ["Alimentari nell'Ue", sgn(tot.ue, "%")],
+            ["Scarto Italia", sgn(d.dIt) + " punti"],
+            ["Scarto Ue", sgn(d.dUe) + " punti"]
+          ],
+          note: d.note || null
+        }), m.left + Math.max(x(d.dIt), x(d.dUe)), d.y - 4);
+      }
+      clearActive = function () { rowsG.classed("is-dimmed", false); };
+      rowsG.on("pointerenter pointerdown", function (ev, d) { activate(d); })
+        .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); clearActive(); } });
+    });
+  }).catch(function (e) { R.fail("#chart", e); });
+
+  function lcFirst(s) { return s.charAt(0).toLowerCase() + s.slice(1); }
+})();
+</script>
+</body>
+</html>

@@ -33,7 +33,7 @@
 <body>
 <div class="wrap">
   <h1>Giornata dei diritti dell'infanzia: obesità, disuguaglianza, prezzi del cibo</h1>
-  <p class="lead">Quattro dataviz Radar – QN, dal mondo all'Italia. Per ognuna: anteprima desktop (760 px) e mobile (360 px) e lo snippet da incollare nel CMS (iframe + script, già pronto). Fonti, scelte sui dati e dati da verificare nel README.</p>
+  <p class="lead">Cinque dataviz Radar – QN, dal mondo all'Italia. Per ognuna: anteprima desktop (760 px) e mobile (360 px) e lo snippet da incollare nel CMS (iframe + script, già pronto). Fonti, scelte sui dati e dati da verificare nel README.</p>
   <div id="list"></div>
 </div>
 <script>
@@ -44,7 +44,8 @@
     { slug: "sorpasso", title: "Per la prima volta nel mondo ci sono più ragazzi obesi che sottopeso", h: 670, csv: "sorpasso.csv", desc: "Linee, 2000-2025" },
     { slug: "disuguaglianza", title: "Dove la ricchezza è distribuita peggio, i bambini pesano di più", h: 845, csv: "disuguaglianza.csv", desc: "Scatter, 43 paesi" },
     { slug: "regioni", title: "Più si va a Sud, più i bambini hanno chili di troppo", h: 895, csv: "regioni.csv", desc: "Tile map, 21 regioni e province autonome" },
-    { slug: "carrello", title: "Il carrello si è ristretto, ma non per tutti", h: 595, csv: "carrello.csv", desc: "Giochino interattivo" }
+    { slug: "carrello", title: "Il carrello si è ristretto, ma non per tutti", h: 595, csv: "carrello.csv", desc: "Giochino interattivo" },
+    { slug: "manubri", title: "In Italia è rincarato soprattutto il cibo fresco", h: 690, csv: "manubri.csv", desc: "Manubri, Italia e Ue" }
   ];
   fetch("assets/embed.min.js").then(function (r) { return r.text(); }).then(function (emb) {
     emb = emb.trim().replace("https://ACCOUNT.github.io", ORIGIN);

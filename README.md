@@ -1,6 +1,6 @@
 # Infanzia e obesità – dataviz Radar QN
 
-Quattro dataviz per il pezzo di Radar – QN sulla Giornata dei diritti dell'infanzia (20 novembre 2026): obesità infantile, disuguaglianza e prezzi del cibo, dal mondo all'Italia. Pagine statiche (HTML, CSS, JS, D3 v7) che leggono i CSV in `data/`: per aggiornare un grafico basta cambiare il CSV. Tutti i numeri mostrati (titoli, etichette, tooltip, frasi) sono letti o calcolati dai CSV.
+Cinque dataviz per il pezzo di Radar – QN sulla Giornata dei diritti dell'infanzia (20 novembre 2026): obesità infantile, disuguaglianza e prezzi del cibo, dal mondo all'Italia. Pagine statiche (HTML, CSS, JS, D3 v7) che leggono i CSV in `data/`: per aggiornare un grafico basta cambiare il CSV. Tutti i numeri mostrati (titoli, etichette, tooltip, frasi) sono letti o calcolati dai CSV.
 
 Indice con anteprime e snippet: `index.html` → https://lorenzobuonarosa.github.io/obesita_italia/
 
@@ -10,8 +10,9 @@ Indice con anteprime e snippet: `index.html` → https://lorenzobuonarosa.github
 | 2 | `disuguaglianza/` | Dove la ricchezza è distribuita peggio, i bambini pesano di più | Scatter + big number | `data/disuguaglianza.csv` | 845 |
 | 3 | `regioni/` | Più si va a Sud, più i bambini hanno chili di troppo | Tile map | `data/regioni.csv` | 895 |
 | 4 | `carrello/` | Il carrello si è ristretto, ma non per tutti | Giochino | `data/carrello.csv` | 595 |
+| 5 | `manubri/` | In Italia è rincarato soprattutto il cibo fresco | Manubri | `data/manubri.csv` | 690 |
 
-Le altezze sono quelle misurate su desktop (760 px); lo script del CMS poi adatta l'altezza da solo (a 360 px: 780, 980, 875, 1008; il carrello cresce di circa 150 px dopo "Scopri quanto ne riempi") e manda il tema del sito.
+Le altezze sono quelle misurate su desktop (760 px); lo script del CMS poi adatta l'altezza da solo (a 360 px: 780, 980, 875, 1008, 902; il carrello cresce di circa 150 px dopo "Scopri quanto ne riempi") e manda il tema del sito.
 
 ## Dati da verificare
 
@@ -28,6 +29,8 @@ Le altezze sono quelle misurate su desktop (760 px); lo script del CMS poi adatt
 11. **Regioni – Trento**: il report provinciale dà valori interi (13% sovrappeso, 3% obesi, 1% obesità grave, 17% eccesso). Sovrappeso e obesità sono presi dalla figura 8 (12,6 e 3,9); l'obesità grave è 1,0 = "1%" arrotondato (segnalato nel tooltip).
 12. **Regioni – 2019**: eccesso di peso 2019 = sovrappeso + obesità dal grafico 3 "Sovrappeso e obesità per Regione – OKkio 2019" (report regionale Lombardia 2019). Italia 2019: 29,8.
 13. **Carrello**: valori Eurostat scaricati via API il 18/11/2026, da ricontrollare a campione su prc_hicp_aind. (Controllati tutti e sette: coincidono con quelli forniti; ultimo aggiornamento della tabella 06/02/2026.)
+14. **Manubri**: valori Eurostat scaricati via API il 18/11/2026, da ricontrollare a campione su prc_hicp_aind. (Controllati tutti: Italia e EU27_2020, 2019 e 2025, coincidono con quelli forniti.)
+15. **Manubri – arrotondamenti.** Gli scarti sono calcolati sui rincari già arrotondati a un decimale (quelli mostrati nel tooltip), così i numeri tornano tra loro. Con questo metodo 6 valori di controllo su 7 coincidono; l'unica differenza è la **verdura fresca Ue: −1,8 invece di −1,9** (con i rincari non arrotondati verrebbe −1,9, ma allora sarebbero sfasati di 0,1 merendine Ue, patatine Italia e Ue, caramelle Ue).
 
 ## Fonti e trasformazioni
 
@@ -52,6 +55,11 @@ Le altezze sono quelle misurate su desktop (760 px); lo script del CMS poi adatt
 - Eurostat, HICP, tabella `prc_hicp_aind`, Italia, indici medi annui base 2015=100 (`INX_A_AVG`). Riempimento oggi = indice 2015 ÷ indice 2025 × 100, mostrato arrotondato all'unità. La riga `Totale alimentari` (CP011) dà solo la linea puntinata della media.
 - Corrispondenze COICOP: CP01161 fresh or chilled fruit; CP01171 fresh or chilled vegetables other than potatoes; CP01173 dried vegetables, other preserved or processed vegetables; CP01114 other bakery products; CP01184 confectionery products; CP01222 soft drinks.
 - Precisione del lettore: errore medio assoluto in punti sui sei sacchetti; su frutta e verdura fresche media dello scarto (stima − dato): oltre +3 ottimista, sotto −3 pessimista, altrimenti precisa.
+
+### 5. `manubri` – `data/manubri.csv`
+- Eurostat, HICP, tabella `prc_hicp_aind`, indici medi annui base 2015=100, Italia ed EU27_2020, anni 2019 e 2025. Codici: CP01161 frutta fresca, CP01171 verdura fresca, CP01114 altri prodotti da forno, CP01175 patatine (crisps), CP01183 cioccolato, CP01184 dolciumi, CP01222 bibite analcoliche, CP011 totale alimentari.
+- Rincaro = indice 2025 ÷ indice 2019 − 1, arrotondato a un decimale. Scarto = rincaro della voce − rincaro del totale alimentari dello stesso paese (Italia +29,4%, Ue +38,2%), in punti. Righe ordinate per gruppo (fresco, poi confezionato e dolci) e, dentro il gruppo, dallo scarto italiano più alto.
+- Colonna `nota`: testo mostrato sotto il grafico e nel tooltip della voce (cioccolato).
 
 ## Snippet per il CMS
 
@@ -93,13 +101,22 @@ Ogni snippet contiene l'iframe e lo script (inline) che adatta l'altezza e manda
 </script>
 ```
 
+### 5. `manubri/` — altezza iniziale 690 px
+
+```html
+<iframe src="https://lorenzobuonarosa.github.io/obesita_italia/manubri/" width="100%" height="690" frameborder="0" scrolling="no" title="In Italia è rincarato soprattutto il cibo fresco"></iframe>
+<script>
+(function(){if(window.__radarQNv2)return;window.__radarQNv2=1;var O="https://lorenzobuonarosa.github.io";var MQ=window.matchMedia("(prefers-color-scheme:dark)");function frames(){return Array.prototype.filter.call(document.getElementsByTagName("iframe"),function(f){return(f.getAttribute("src")||"").indexOf(O+"/")===0;});}function theme(){var t=document.documentElement.getAttribute("data-theme");return t==="dark"||t==="light"?t:(MQ.matches?"dark":"light");}function bgOf(el){for(;el&&el.nodeType===1;el=el.parentElement){var c=getComputedStyle(el).backgroundColor;if(c&&c !=="transparent"&&!/rgba\([^)]*,\s*0\)$/.test(c))return c;}return null;}function send(f){try{f.contentWindow.postMessage({sentinel:"radar-qn",type:"theme",theme:theme(),bg:bgOf(f.parentElement)},O);}catch(e){}}function sendAll(){frames().forEach(send);}window.addEventListener("message",function(e){if(e.origin !==O)return;var d=e.data;if(!d||d.sentinel !=="radar-qn"||d.type !=="height")return;frames().forEach(function(f){if(f.contentWindow !==e.source)return;var h=Math.ceil(+d.height);if(h > 0&&20000 > h)f.style.height=h+"px";send(f);});});new MutationObserver(function(){sendAll();setTimeout(sendAll,400);}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});if(MQ.addEventListener)MQ.addEventListener("change",sendAll);})();
+</script>
+```
+
 ## Struttura
 
 ```
 index.html        anteprime desktop + mobile e snippet "Copia"
 data/             CSV (separatore ; e virgola decimale, UTF-8)
 assets/           radar.css, radar.js, embed.js, embed.min.js, logo
-sorpasso/ disuguaglianza/ regioni/ carrello/
+sorpasso/ disuguaglianza/ regioni/ carrello/ manubri/
 ```
 
 Prova in locale: `python3 -m http.server` nella cartella e apri `http://localhost:8000/`. Sfondo forzabile con `?bg=grigio|bianco|nero|notte`.
