@@ -25,10 +25,7 @@
   .bag .bag__fill.is-true { fill: var(--blue); }
   .bag__grip { stroke: var(--ink); stroke-width: 2; }
   .bag__val { font-size: 19px; font-weight: 700; fill: var(--ink); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; font-variant-numeric: tabular-nums; }
-  .bag__est { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 4 3; }
-  .bag__avg { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 0.1 4; stroke-linecap: round; }
   .bag__tag rect { fill: var(--bg); stroke: var(--ink); stroke-width: 1.2; }
-  .bag__tag line { stroke: var(--ink-2); stroke-width: 1; }
   .bag__tag text { font-size: 9.5px; font-weight: 700; fill: var(--ink); text-anchor: middle; }
   .bag__hint { font-size: 10px; font-weight: 600; fill: var(--ink-2); text-anchor: middle; pointer-events: none; }
   .bag__res { font-size: 12px; color: var(--ink-2); min-height: 1.4em; font-variant-numeric: tabular-nums; margin-top: 4px; }
@@ -43,8 +40,6 @@
   .result[hidden] { display: none; }
   .result__main { font-size: 17px; line-height: 1.4; font-weight: 600; margin: 0; max-width: 680px; }
   .result__acc { font-size: 15px; line-height: 1.45; margin: 8px 0 0; color: var(--ink); max-width: 680px; }
-  .sw--est { width: 20px; height: 0; border-top: 1.5px dashed var(--ink); border-radius: 0; }
-  .sw--avg { width: 20px; height: 0; border-top: 2px dotted var(--ink); border-radius: 0; }
   .sw--fresh { background: var(--red); } .sw--other { background: var(--blue); }
 </style>
 </head>
@@ -68,8 +63,7 @@
     <div class="r-key">
       <span><i class="sw sw--fresh"></i>Frutta e verdura fresche</span>
       <span><i class="sw sw--other"></i>Altri alimenti</span>
-      <span><i class="sw sw--est"></i>La tua stima</span>
-      <span id="key-avg"><i class="sw sw--avg"></i></span>
+      <span id="key-avg"></span>
     </div>
   </div>
 
@@ -85,7 +79,7 @@
 (function () {
   var R = Radar, fmt = R.fmt;
   var TOL = 3;                         // entro 3 punti = stima precisa
-  var VB = { w: 100, h: 124, top: 32, bottom: 120 };   // geometria del sacchetto (viewBox)
+  var VB = { w: 100, h: 124, top: 32, bottom: 120, tag: -18 };   // geometria del sacchetto (viewBox)
   var BODY = "M14," + VB.top + " L86," + VB.top + " L91," + VB.bottom + " L9," + VB.bottom + " Z";
   var HANDLE = "M33," + (VB.top + 4) + " C33,6 67,6 67," + (VB.top + 4);
 
@@ -108,7 +102,7 @@
     var avg = avgRow ? avgRow.fill : null;
     var revealed = false;
 
-    if (avg != null) d3.select("#key-avg").append("span").text("Media di tutti gli alimentari (" + fmt(avg, 0) + "%)");
+    if (avg != null) d3.select("#key-avg").text("Tutti gli alimentari, in media: " + fmt(avg, 0) + "%");
     else d3.select("#key-avg").remove();
 
     var wrap = d3.select("#bags");
@@ -117,21 +111,18 @@
 
     cards.each(function (d, i) {
       var card = d3.select(this);
-      var svg = card.append("svg").attr("viewBox", "0 0 " + VB.w + " " + VB.h)
+      var svg = card.append("svg").attr("viewBox", "0 " + VB.tag + " " + VB.w + " " + (VB.h - VB.tag))
         .attr("role", "img").attr("aria-label", "Sacchetto: " + d.name);
       var cid = "clip" + i;
       svg.append("clipPath").attr("id", cid).append("path").attr("d", BODY);
       svg.append("path").attr("class", "bag__handle").attr("d", HANDLE);
       // cartellino con i soldi: 10 euro per ogni sacchetto
       var tag = svg.append("g").attr("class", "bag__tag");
-      tag.append("line").attr("x1", 63).attr("y1", 14).attr("x2", 74).attr("y2", 9);
-      tag.append("rect").attr("x", 72).attr("y", 1).attr("width", 27).attr("height", 15).attr("rx", 2);
-      tag.append("text").attr("x", 85.5).attr("y", 12).text("10 €");
+      tag.append("rect").attr("x", 35).attr("y", VB.tag).attr("width", 30).attr("height", 16).attr("rx", 2);
+      tag.append("text").attr("x", 50).attr("y", VB.tag + 11.5).text("10 €");
       svg.append("path").attr("class", "bag__body").attr("d", BODY);
       var gIn = svg.append("g").attr("clip-path", "url(#" + cid + ")");
       d.fillRect = gIn.append("rect").attr("class", "bag__fill").attr("x", 0).attr("width", VB.w);
-      d.avgLine = gIn.append("line").attr("class", "bag__avg").attr("x1", 4).attr("x2", 96).style("opacity", 0);
-      d.estLine = gIn.append("line").attr("class", "bag__est").attr("x1", 4).attr("x2", 96).style("opacity", 0);
       d.grip = gIn.append("line").attr("class", "bag__grip").attr("x1", 38).attr("x2", 62);
       svg.append("path").attr("d", BODY).style("fill", "none").style("stroke", "var(--ink-2)").attr("stroke-width", 1.5);
       d.valText = svg.append("text").attr("class", "bag__val").attr("x", 50).attr("y", 84);
@@ -184,9 +175,6 @@
         d.fillRect.classed("is-true", true);
         d.grip.style("opacity", 0);
         d.hint.style("opacity", 0);
-        var yE = lev(d.est);
-        d.estLine.attr("y1", yE).attr("y2", yE).style("opacity", 1);
-        if (avg != null) d.avgLine.attr("y1", lev(avg)).attr("y2", lev(avg)).transition().delay(dur).duration(300).style("opacity", 1);
         var from = d.est, to = d.fill;
         d.fillRect.transition().delay(i * 60).duration(dur).ease(d3.easeCubicInOut)
           .attr("y", lev(to)).attr("height", VB.bottom - lev(to) + 2);
@@ -228,8 +216,6 @@
         d.input.attr("disabled", null);
         d.fillRect.interrupt().classed("is-true", false);
         d.valText.interrupt();
-        d.estLine.style("opacity", 0);
-        d.avgLine.interrupt().style("opacity", 0);
         d.res.html("");
         setEst(d, 0);
       });
