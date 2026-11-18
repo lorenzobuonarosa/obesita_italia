@@ -11,7 +11,7 @@ Indice con anteprime e snippet: `index.html` → https://lorenzobuonarosa.github
 | 3 | `regioni/` | Più si va a Sud, più i bambini hanno chili di troppo | Tile map | `data/regioni.csv` | 895 |
 | 4 | `carrello/` | Il carrello si è ristretto, ma non per tutti | Giochino | `data/carrello.csv` | 555 |
 
-Le altezze sono quelle misurate su desktop (760 px); lo script del CMS poi adatta l'altezza da solo (a 360 px: 780, 980, 892, 950; il carrello cresce di circa 150 px dopo "Scopri quanto ne riempi") e manda il tema del sito.
+Le altezze sono quelle misurate su desktop (760 px); lo script del CMS poi adatta l'altezza da solo (a 360 px: 780, 980, 875, 950; il carrello cresce di circa 150 px dopo "Scopri quanto ne riempi") e manda il tema del sito.
 
 ## Dati da verificare
 
